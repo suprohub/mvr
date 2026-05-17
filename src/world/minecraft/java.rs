@@ -68,32 +68,55 @@ impl<S: SubstanceSolver<Block>> EditorImpl<Block, S> for Java<S> {
         {
             block
         } else {
-            Block::new("air")
+            Block::new("minecraft:air")
         }
     }
 
     fn get_batch_impl(&mut self, positions: impl Iterator<Item = IVec3>) -> Vec<Block> {
-        let (min, max) = positions.size_hint();
-        let mut position_groups: FxHashMap<IVec2, Vec<_>> =
-            FxHashMap::with_capacity_and_hasher(max.unwrap_or(min), FxBuildHasher::default());
-        for pos in positions {
+        let positions: Vec<IVec3> = positions.collect();
+        let total = positions.len();
+        let mut result: Vec<Option<Block>> = vec![None; total];
+
+        let mut position_groups: FxHashMap<IVec2, Vec<(usize, Coords)>> =
+            FxHashMap::with_capacity_and_hasher(total, FxBuildHasher::default());
+
+        for (i, &pos) in positions.iter().enumerate() {
+            let rpos = java_region_pos(pos);
+            let block_pos = java_block_pos(pos);
             position_groups
-                .entry(java_region_pos(pos))
-                .and_modify(|v| v.push(java_block_pos(pos)))
-                .or_insert(Vec::new());
+                .entry(rpos)
+                .or_default()
+                .push((i, block_pos));
         }
 
-        let mut blocks = Vec::with_capacity(position_groups.len());
-        for (rpos, positions) in position_groups {
-            if let Some(region) = self.regions.get(&rpos)
-                && let Ok(paletted_container) = region.get_blocks(&positions)
-            {
-                blocks.extend(paletted_container.into_iter().map(|(_, b)| b));
+        for (rpos, group) in position_groups {
+            if let Some(region) = self.regions.get(&rpos) {
+                let coords_list: Vec<Coords> = group.iter().map(|&(_, c)| c).collect();
+                if let Ok(paletted_container) = region.get_blocks(&coords_list) {
+                    for (index, coords) in group {
+                        match paletted_container.get(coords) {
+                            Ok(Some(block)) => result[index] = Some(block),
+                            _ => result[index] = Some(Block::new("minecraft:air")),
+                        }
+                    }
+                } else {
+                    for (index, _) in group {
+                        result[index] = Some(Block::new("minecraft:air"));
+                    }
+                    println!("here");
+                }
             } else {
-                blocks.extend(std::iter::repeat_n(Block::new("air"), positions.len()));
+                for (index, _) in group {
+                    result[index] = Some(Block::new("minecraft:air"));
+                }
+                println!("here");
             }
         }
-        blocks
+
+        result
+            .into_iter()
+            .map(|opt| opt.expect("All indices should have been set"))
+            .collect()
     }
 
     fn set_impl(&mut self, pos: IVec3, block: Block) {

@@ -1,7 +1,5 @@
 use geo::Geometry;
 use glam::{IVec2, IVec3};
-use ndarray::Array2;
-use nonany::NonMinI16;
 use tracing::debug;
 
 use crate::{
@@ -60,10 +58,9 @@ impl<V: Clone + std::fmt::Debug, S: SubstanceSolver<V>> ProcessElement<V, S> for
                 for p in &area_points {
                     if let Some(cell) = elevation.get_mut((p.y as usize, p.x as usize))
                         && let Some(val) = cell
-                        && val.get() >= base_height as i16
-                    {
-                        *cell = None;
-                    }
+                        && val.get() >= base_height as i16 {
+                            *cell = None;
+                        }
                 }
 
                 let wall_mat = Material::Stones;
@@ -210,6 +207,15 @@ fn rasterize_polygon(vertices: &[IVec2]) -> Vec<IVec2> {
             }
         }
     }
+
+    for i in 0..vertices.len() {
+        let p0 = vertices[i];
+        let p1 = vertices[(i + 1) % vertices.len()];
+        result.extend(points_on_line(p0, p1));
+    }
+
+    result.sort_by_key(|p| (p.y, p.x));
+    result.dedup();
     result
 }
 

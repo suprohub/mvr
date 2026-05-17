@@ -1,7 +1,5 @@
 use disponent::declare;
 use geo::Geometry;
-use ndarray::Array2;
-use nonany::NonMinI16;
 
 use crate::{
     elevation::Elevation,

@@ -4,8 +4,6 @@ use anyhow::Result;
 use disponent::declare;
 use geo::{Coord, LineString, Polygon, TriangulateEarcut};
 use glam::{DVec3, IVec2, IVec3, Vec3Swizzles};
-use ndarray::Array2;
-use nonany::NonMinI16;
 use rand::{distr::Distribution, seq::IndexedRandom};
 
 use crate::{

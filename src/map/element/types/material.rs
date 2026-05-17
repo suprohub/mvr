@@ -72,6 +72,7 @@ impl From<(SubstanceType, Rgb<u8>, MultiMaterial)> for Substance {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, From)]
+#[non_exhaustive]
 pub enum SubstanceType {
     #[default]
     Universal,
@@ -144,6 +145,7 @@ impl From<MultiMaterial> for Material {
 /// (common, rare, misspelled or in other languages).
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum Material {
     /// Italian for steel.
     Acciaio,

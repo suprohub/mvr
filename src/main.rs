@@ -3,8 +3,6 @@ use std::{fs, path::PathBuf, str::FromStr, sync::LazyLock};
 use anyhow::Result;
 use clap::Parser;
 use glam::IVec3;
-use ndarray::Array2;
-use nonany::NonMinI16;
 use reqwest::{Client, ClientBuilder};
 use tracing::{Level, info};
 use tracing_subscriber::FmtSubscriber;
@@ -103,18 +101,39 @@ async fn main() -> Result<()> {
     // 4. Generate voxels using raw elevation (global offset will be applied internally)
     let grass_block = editor.substance_to_voxel(Material::Grass);
     let grass = editor.substance_to_voxel((SubstanceType::Surface, Material::Grass));
-    let mut voxels = Vec::with_capacity(width * height);
+
+    let mut infos = Vec::with_capacity(width * height);
+    let mut air_check_positions = Vec::with_capacity(width * height);
+
     for z in 0..height {
         for x in 0..width {
             if let Some(h) = elevation.heights_mod[(z, x)] {
                 let y = h.get() as i32;
-                voxels.push((IVec3::new(x as i32, z as i32, y), grass_block.clone()));
-                voxels.push((IVec3::new(x as i32, z as i32, y + 1), grass.clone()));
+                let base_pos = IVec3::new(x as i32, z as i32, y);
+                infos.push(base_pos);
+                air_check_positions.push(IVec3::new(x as i32, z as i32, y + 1));
             }
         }
     }
 
-    editor.set_batch(voxels.into_iter());
+    let grass_blocks_batch = infos.iter().map(|pos| (*pos, grass_block.clone()));
+    editor.set_batch(grass_blocks_batch);
+
+    let air_voxels = editor.get_batch(air_check_positions.into_iter());
+
+    let grass_batch = infos
+        .into_iter()
+        .zip(air_voxels.into_iter())
+        .filter_map(|(base_pos, above)| {
+            if above.name == "minecraft:air" {
+                let grass_pos = IVec3::new(base_pos.x, base_pos.y, base_pos.z + 1);
+                Some((grass_pos, grass.clone()))
+            } else {
+                None
+            }
+        });
+    editor.set_batch(grass_batch);
+
     editor.save(&PathBuf::from(&args.out))?;
 
     Ok(())

@@ -5,7 +5,6 @@ use derive_more::Display;
 use disponent::declare;
 use glam::USizeVec2;
 use ndarray::Array2;
-use nonany::NonMinI16;
 
 use crate::{
     elevation::{Elevation, geo_distance},

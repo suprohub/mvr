@@ -12,6 +12,7 @@ pub struct Building {
 
 /// Type of building.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum BuildingKind {
     /// A general tag for a building of an unspecified type.
     Unspecified,
@@ -38,6 +39,7 @@ pub enum BuildingKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum ResidentialKind {
     /// A general tag for a building constructed primarily for residential purposes.
     Residential,
@@ -70,6 +72,7 @@ pub enum ResidentialKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum CommercialKind {
     /// A building constructed for non-specific commercial activities to take place there.
     Commercial,
@@ -83,6 +86,7 @@ pub enum CommercialKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum IndustrialKind {
     /// A building constructed to house some manufacturing process.
     Industrial,
@@ -91,6 +95,7 @@ pub enum IndustrialKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum AgriculturalKind {
     /// A building on a farm that is not a dwelling.
     FarmAuxiliary,
@@ -104,6 +109,7 @@ pub enum AgriculturalKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum CivicKind {
     /// A building originally built as a school building.
     School,
@@ -125,6 +131,7 @@ pub enum CivicKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum ReligiousKind {
     /// A building that was built as a church.
     Church,
@@ -135,6 +142,7 @@ pub enum ReligiousKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum TransportationKind {
     /// Denotes a single-owner private garage.
     Garage,
@@ -150,6 +158,7 @@ pub enum TransportationKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum StorageKind {
     /// A building that was originally built as a commercial building for storage of goods.
     Warehouse,
@@ -160,6 +169,7 @@ pub enum StorageKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum MilitaryKind {
     /// A hardened military building.
     Bunker,
@@ -170,6 +180,7 @@ pub enum MilitaryKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum OtherKind {
     /// A less important building near to and on the same piece of land as a larger building.
     Outbuilding,
