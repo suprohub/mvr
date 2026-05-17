@@ -4,11 +4,11 @@ authors = ["suprohub <suprohub@gmail.com>"]
 version = "0.1.0"
 edition = "2024"
 description = "World maps to Voxel Reconstruction"
-repository = "https://github.com/suprohub/wmr"
+repository = "https://github.com/suprohub/ovr"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = [
-    "wmr",
+    "ovr",
     "world",
     "maps",
     "map",
