@@ -1,4 +1,4 @@
-# World Maps to Voxel Reconstruction (MVR)
+# World Maps to Voxels Reconstruction (MVR)
 
 ![Logo](assets/logo.jpeg)
 **Generate real-world terrain and buildings in voxels from geospatial data.**
