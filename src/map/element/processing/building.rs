@@ -35,10 +35,8 @@ impl<V: Clone + std::fmt::Debug, S: SubstanceSolver<V>> ProcessElement<V, S> for
                     .map(|c| IVec2::new(c.x(), c.y()))
                     .collect();
 
-                // Rasterize polygon area
                 let area_points = rasterize_polygon(&pts2d);
 
-                // Compute average base height from elevation
                 let mut sum: i64 = 0;
                 let mut count: i64 = 0;
                 for p in &area_points {
@@ -54,19 +52,18 @@ impl<V: Clone + std::fmt::Debug, S: SubstanceSolver<V>> ProcessElement<V, S> for
                     todo!()
                 };
 
-                // Clear elevation under the building
                 for p in &area_points {
                     if let Some(cell) = elevation.get_mut((p.y as usize, p.x as usize))
                         && let Some(val) = cell
-                        && val.get() >= base_height as i16 {
-                            *cell = None;
-                        }
+                        && val.get() >= base_height as i16
+                    {
+                        *cell = None;
+                    }
                 }
 
                 let wall_mat = Material::Stones;
                 let slab_mat = Material::Stones;
 
-                // Underground floors
                 for i in 1..=underground {
                     let z_bottom = base_height - i * FLOOR_HEIGHT;
                     let pts3d: Vec<IVec3> = pts2d
@@ -88,14 +85,12 @@ impl<V: Clone + std::fmt::Debug, S: SubstanceSolver<V>> ProcessElement<V, S> for
                     }
                 }
 
-                // Above-ground slabs
                 for i in 0..=levels {
                     let z = base_height + i * FLOOR_HEIGHT;
                     let pts3d: Vec<IVec3> = pts2d.iter().map(|p| IVec3::new(p.x, p.y, z)).collect();
                     editor.fill_polygon(pts3d, Some(slab_mat), None::<Substance>);
                 }
 
-                // Walls between slabs
                 for i in 0..levels {
                     let z_start = base_height + i * FLOOR_HEIGHT + 1;
                     let z_end = base_height + (i + 1) * FLOOR_HEIGHT - 1;
@@ -106,7 +101,6 @@ impl<V: Clone + std::fmt::Debug, S: SubstanceSolver<V>> ProcessElement<V, S> for
                     }
                 }
 
-                // Windows: 2×2 glass panes
                 let window_width: i32 = 2;
                 let window_height: i32 = 2;
                 let window_spacing: i32 = 2;
@@ -168,42 +162,50 @@ impl<V: Clone + std::fmt::Debug, S: SubstanceSolver<V>> ProcessElement<V, S> for
     }
 }
 
-/// Rasterize a simple polygon into all integer points inside and on the boundary
+fn point_in_polygon(p: IVec2, vertices: &[IVec2]) -> bool {
+    let x = p.x;
+    let y = p.y;
+    let n = vertices.len();
+    let mut inside = false;
+    let mut j = n - 1;
+    for i in 0..n {
+        let xi = vertices[i].x;
+        let yi = vertices[i].y;
+        let xj = vertices[j].x;
+        let yj = vertices[j].y;
+
+        if (yi > y) != (yj > y) {
+            let intersect = if yi < yj {
+                (x - xi) * (yj - yi) < (xj - xi) * (y - yi)
+            } else {
+                (x - xi) * (yj - yi) > (xj - xi) * (y - yi)
+            };
+            if intersect {
+                inside = !inside;
+            }
+        }
+        j = i;
+    }
+    inside
+}
+
 fn rasterize_polygon(vertices: &[IVec2]) -> Vec<IVec2> {
     if vertices.len() < 3 {
         return vec![];
     }
+
+    let min_x = vertices.iter().map(|p| p.x).min().unwrap();
+    let max_x = vertices.iter().map(|p| p.x).max().unwrap();
     let min_y = vertices.iter().map(|p| p.y).min().unwrap();
     let max_y = vertices.iter().map(|p| p.y).max().unwrap();
+
     let mut result = Vec::new();
 
     for y in min_y..=max_y {
-        let mut intersections = vec![];
-        for i in 0..vertices.len() {
-            let p0 = vertices[i];
-            let p1 = vertices[(i + 1) % vertices.len()];
-            if p0.y == p1.y {
-                continue;
-            }
-            let (y0, y1, x0, x1) = if p0.y < p1.y {
-                (p0.y, p1.y, p0.x, p1.x)
-            } else {
-                (p1.y, p0.y, p1.x, p0.x)
-            };
-            if y >= y0 && y < y1 {
-                let t = (y - y0) as f32 / (y1 - y0) as f32;
-                let x = x0 as f32 + t * (x1 - x0) as f32;
-                intersections.push(x.round() as i32);
-            }
-        }
-        intersections.sort();
-        for pair in intersections.chunks(2) {
-            if pair.len() == 2 {
-                let x_start = pair[0];
-                let x_end = pair[1];
-                for x in x_start..=x_end {
-                    result.push(IVec2::new(x, y));
-                }
+        for x in min_x..=max_x {
+            let p = IVec2::new(x, y);
+            if point_in_polygon(p, vertices) {
+                result.push(p);
             }
         }
     }
@@ -219,7 +221,6 @@ fn rasterize_polygon(vertices: &[IVec2]) -> Vec<IVec2> {
     result
 }
 
-/// Bresenham's line algorithm – all integer points along the segment
 fn points_on_line(p0: IVec2, p1: IVec2) -> Vec<IVec2> {
     let mut points = Vec::new();
     let mut x = p0.x;

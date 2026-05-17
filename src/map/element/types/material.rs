@@ -79,6 +79,8 @@ pub enum SubstanceType {
     Surface,
     Wall,
     Roof,
+    Continuation,
+    Cover,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, From)]
@@ -455,6 +457,7 @@ pub enum Material {
     Granit,
     /// Living grass vegetation.
     Grass,
+    TallGrass,
     /// An area dominated by grasses (grassland).
     Grassland,
     /// Grass reinforcement grid or paver. See [`GrassPaverType`].

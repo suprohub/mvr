@@ -66,12 +66,10 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     info!("OMR Started");
 
-    // 1. Obtain raw elevation data
     let mut provider = ElevationProviders::Aws(Aws);
     let bbox = BBox::from_str(&args.bbox)?;
     let mut elevation: Elevation = provider.fetch(bbox, 1.0).await?;
 
-    // 2. Process map elements (roads, rivers, etc.) – they may modify the elevation
     let mut editor = Editors::MinecraftJava(Java::new());
 
     let min_height = elevation
@@ -95,44 +93,85 @@ async fn main() -> Result<()> {
         element.process_element(&mut editor, &mut elevation);
     }
 
-    // 3. Set a global vertical offset so that the lowest terrain sits at GROUND_LEVEL
     let (height, width) = elevation.dim();
 
-    // 4. Generate voxels using raw elevation (global offset will be applied internally)
     let grass_block = editor.substance_to_voxel(Material::Grass);
-    let grass = editor.substance_to_voxel((SubstanceType::Surface, Material::Grass));
+    let grass = editor.substance_to_voxel((SubstanceType::Cover, Material::Grass));
+    let tall_grass_lower = editor.substance_to_voxel((SubstanceType::Cover, Material::TallGrass));
+    let tall_grass_upper =
+        editor.substance_to_voxel((SubstanceType::Continuation, Material::TallGrass));
 
-    let mut infos = Vec::with_capacity(width * height);
-    let mut air_check_positions = Vec::with_capacity(width * height);
+    let mut infos: Vec<(IVec3, bool)> = Vec::with_capacity(width * height);
+    let mut air_check_positions_y1 = Vec::with_capacity(width * height);
 
     for z in 0..height {
         for x in 0..width {
             if let Some(h) = elevation.heights_mod[(z, x)] {
                 let y = h.get() as i32;
                 let base_pos = IVec3::new(x as i32, z as i32, y);
-                infos.push(base_pos);
-                air_check_positions.push(IVec3::new(x as i32, z as i32, y + 1));
+
+                let is_lower = [
+                    (x.wrapping_sub(1), z),
+                    (x + 1, z),
+                    (x, z.wrapping_sub(1)),
+                    (x, z + 1),
+                ]
+                .iter()
+                .any(|&(nx, nz)| {
+                    if nx < width
+                        && nz < height
+                        && let Some(nh) = elevation.heights_mod[(nz, nx)]
+                    {
+                        return nh.get() as i32 > y;
+                    }
+                    false
+                });
+
+                infos.push((base_pos, is_lower));
+                air_check_positions_y1.push(IVec3::new(x as i32, z as i32, y + 1));
             }
         }
     }
 
-    let grass_blocks_batch = infos.iter().map(|pos| (*pos, grass_block.clone()));
+    let grass_blocks_batch = infos.iter().map(|(pos, _)| (*pos, grass_block.clone()));
     editor.set_batch(grass_blocks_batch);
 
-    let air_voxels = editor.get_batch(air_check_positions.into_iter());
+    let air_y1 = editor.get_batch(air_check_positions_y1.into_iter());
 
-    let grass_batch = infos
-        .into_iter()
-        .zip(air_voxels.into_iter())
-        .filter_map(|(base_pos, above)| {
-            if above.name == "minecraft:air" {
-                let grass_pos = IVec3::new(base_pos.x, base_pos.y, base_pos.z + 1);
-                Some((grass_pos, grass.clone()))
-            } else {
-                None
-            }
-        });
-    editor.set_batch(grass_batch);
+    let mut air_check_positions_y2 = Vec::new();
+    for (pos, is_lower) in &infos {
+        if *is_lower {
+            air_check_positions_y2.push(IVec3::new(pos.x, pos.y, pos.z + 2));
+        }
+    }
+    let air_y2 = editor.get_batch(air_check_positions_y2.into_iter());
+
+    let mut y2_iter = air_y2.into_iter();
+    let mut vegetation_batch = Vec::new();
+
+    for (i, (base_pos, is_lower)) in infos.iter().enumerate() {
+        let above1 = &air_y1[i];
+        let above1_is_air = above1.name == "minecraft:air";
+
+        if *is_lower
+            && let Some(above2) = y2_iter.next()
+            && above1_is_air
+            && above2.name == "minecraft:air"
+        {
+            let lower_pos = IVec3::new(base_pos.x, base_pos.y, base_pos.z + 1);
+            let upper_pos = IVec3::new(base_pos.x, base_pos.y, base_pos.z + 2);
+            vegetation_batch.push((lower_pos, tall_grass_lower.clone()));
+            vegetation_batch.push((upper_pos, tall_grass_upper.clone()));
+            continue;
+        }
+
+        if above1_is_air {
+            let grass_pos = IVec3::new(base_pos.x, base_pos.y, base_pos.z + 1);
+            vegetation_batch.push((grass_pos, grass.clone()));
+        }
+    }
+
+    editor.set_batch(vegetation_batch.into_iter());
 
     editor.save(&PathBuf::from(&args.out))?;
 

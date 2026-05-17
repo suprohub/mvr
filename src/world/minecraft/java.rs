@@ -1,5 +1,6 @@
 use std::{
     cmp::Ordering,
+    collections::BTreeMap,
     fs::{self, File},
     path::Path,
     sync::Arc,
@@ -198,17 +199,14 @@ pub struct VanillaSolver;
 
 impl SubstanceSolver<Block> for VanillaSolver {
     fn substance_to_choice(&self, substance: Substance) -> Choice<Block> {
-        if substance.typ == SubstanceType::Surface {
-            return Choice::Single(Block::new("grass"));
-        }
         match substance.kind {
-            SubstanceKind::Material(material) => material_to_choice(material.into()),
-            _ => material_to_choice(Material::Stones),
+            SubstanceKind::Material(material) => material_to_choice(material.into(), substance.typ),
+            _ => material_to_choice(Material::Stones, substance.typ),
         }
     }
 }
 
-fn material_to_choice(material: Material) -> Choice<Block> {
+fn material_to_choice(material: Material, typ: SubstanceType) -> Choice<Block> {
     match material {
         Material::Acciaio => Choice::Single(Block::new("iron_block")),
         Material::Acrylic => Choice::Single(Block::new("glass")),
@@ -526,8 +524,21 @@ fn material_to_choice(material: Material) -> Choice<Block> {
             Choice::Uniform(vec![Block::new("granite"), Block::new("polished_granite")])
         }
         Material::Grass | Material::Grassland | Material::GrassScrub => {
-            Choice::Single(Block::new("grass_block"))
+            Choice::Single(if typ == SubstanceType::Cover {
+                Block::new("grass")
+            } else {
+                Block::new("grass_block")
+            })
         }
+        Material::TallGrass => Choice::Single(match typ {
+            SubstanceType::Cover => Block::new("tall_grass"),
+            SubstanceType::Continuation => {
+                let mut block = Block::new("tall_grass");
+                block.properties = Some(BTreeMap::from([("half".into(), "upper".into())]));
+                block
+            }
+            _ => Block::new("grass_block"),
+        }),
         Material::GrassPaver(t) => match t {
             GrassPaverType::Solid => Choice::Weighted(vec![
                 (0.6, Block::new("grass_block")),
