@@ -1,6 +1,6 @@
-# World maps to Voxel Reconstruction (OVR)
+# World Maps to Voxel Reconstruction (MVR)
 
-![Logo](assets/logo.png)
+![Logo](assets/logo.jpeg)
 **Generate real-world terrain and buildings in voxels from geospatial data.**
 
 ## Overview
