@@ -1,12 +1,9 @@
 # World Maps to Voxels Reconstruction (MVR)
 
-![Logo](assets/logo.jpeg)
+![cool imig](assets/imig.png)
 **Generate real-world terrain and buildings in voxels from geospatial data.**
 
 ## Overview
-
-![cool imig](assets/imig.png)
-
 MVR is a Rust-based tool that converts real-world geographic data into voxel worlds. It retrieves elevation data from AWS’s global heightmap tiles and vector map data from OpenStreetMap. The current implementation focuses on generating terrain and building outlines, but the architecture is designed to be extensible – new data providers, element types (roads, rivers, etc.) and output backends (other game engines) can be added.
 
 The generated world consists of a set of Minecraft Java Edition region files, ready to be placed into a `saves` folder.
