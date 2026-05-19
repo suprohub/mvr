@@ -1,5 +1,6 @@
 use derive_more::From;
 use image::Rgb;
+use strum::EnumString;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, From)]
 pub struct Substance {
@@ -71,7 +72,7 @@ impl From<(SubstanceType, Rgb<u8>, MultiMaterial)> for Substance {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, From)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, From)]
 #[non_exhaustive]
 pub enum SubstanceType {
     #[default]
@@ -146,7 +147,8 @@ impl From<MultiMaterial> for Material {
 /// The enum includes all values found in OSM's `material` key
 /// (common, rare, misspelled or in other languages).
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 #[non_exhaustive]
 pub enum Material {
     /// Italian for steel.
@@ -965,9 +967,11 @@ pub enum Material {
 }
 
 /// Chemical element used as a material marker.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum Element {
     /// Silver (chemical symbol Ag).
+    #[default]
     Ag,
     /// Aluminium (chemical symbol Al).
     Al,
@@ -976,13 +980,15 @@ pub enum Element {
 }
 
 /// Specific form or shape of metal.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum MetalForm {
     /// Metal bars.
     Bars,
     /// Expanded metal or welded grid.
     Grid,
     /// Metal in sheet form.
+    #[default]
     Sheet,
     /// Metal wire.
     Wire,
@@ -995,9 +1001,11 @@ pub enum MetalForm {
 }
 
 /// Sub‑types of concrete.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum ConcreteType {
     /// Plain concrete without reinforcement.
+    #[default]
     Plain,
     /// Reinforced concrete, that is concrete strengthened with embedded steel bars.
     Reinforced,
@@ -1016,18 +1024,22 @@ pub enum ConcreteType {
 }
 
 /// Sub‑types of cement.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum CementType {
     /// Cement with brick fragments.
+    #[default]
     Brick,
     /// Plain cement without additives.
     Plain,
 }
 
 /// Sub‑types of asphalt.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum AsphaltType {
     /// Standard asphalt.
+    #[default]
     Plain,
     /// Asphalt divided into lanes.
     Lanes,
@@ -1040,27 +1052,33 @@ pub enum AsphaltType {
 }
 
 /// Sub‑types of ground surface.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum GroundType {
     /// Natural, untreated ground.
+    #[default]
     Plain,
     /// Ground surface divided into lanes.
     Lanes,
 }
 
 /// Sub‑types of grass paver.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum GrassPaverType {
     /// Solid grass paver.
+    #[default]
     Solid,
     /// Grass paver arranged in lanes.
     Lanes,
 }
 
 /// Sub‑types of paving stones.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum PavingStonesType {
     /// Generic paving stones.
+    #[default]
     Plain,
     /// Paving stones arranged in lanes.
     Lanes,
@@ -1071,9 +1089,11 @@ pub enum PavingStonesType {
 }
 
 /// Sub‑types of cobblestone.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum CobblestoneType {
     /// Natural, rounded cobblestone.
+    #[default]
     Plain,
     /// Cobblestone that has been flattened.
     Flattened,
@@ -1082,18 +1102,22 @@ pub enum CobblestoneType {
 }
 
 /// Sub‑types of sett paving.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum SettType {
     /// Standard sett paving.
+    #[default]
     Plain,
     /// Sett paving in plate form.
     Plates,
 }
 
 /// Sub‑types of stone surface.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum StoneType {
     /// Generic stone.
+    #[default]
     Plain,
     /// Stone plates.
     Plates,
@@ -1102,27 +1126,33 @@ pub enum StoneType {
 }
 
 /// Sub‑types of gravel.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum GravelType {
     /// Standard loose gravel.
+    #[default]
     Plain,
     /// Gravel surface with distinct lanes.
     Lanes,
 }
 
 /// Sub‑types of compacted surface.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum CompactedType {
     /// Standard compacted surface.
+    #[default]
     Plain,
     /// Compacted surface with lanes.
     Lanes,
 }
 
 /// Sub‑types of granite.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum GraniteType {
     /// Standard granite.
+    #[default]
     Plain,
     /// Granite plates.
     Plates,

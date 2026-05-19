@@ -1,13 +1,20 @@
-use std::collections::HashMap;
-
 use anyhow::Result;
 use geo::{Coord, Geometry, LineString, Point, Polygon};
+use image::Rgb;
 use serde::Deserialize;
+use std::{collections::HashMap, str::FromStr};
+use tracing::debug;
 
 use crate::{
     CLIENT,
     map::{
-        element::{Element, ElementKind, types::building::*},
+        element::{
+            Element, ElementKind,
+            types::{
+                building::*,
+                material::{Material, Substance, SubstanceType},
+            },
+        },
         provider::ElementProvider,
     },
     util::bbox::BBox,
@@ -101,9 +108,10 @@ impl ElementProvider for Osm {
             .get("https://overpass-api.de/api/interpreter")
             .query(&[("data", query)])
             .send()
-            .await?
-            .bytes()
             .await?;
+
+        debug!("Response: {:?}", result.status());
+        let result = result.bytes().await?;
 
         let data: OsmData = serde_json::from_slice(&result)?;
         let mut node_coords: HashMap<u64, (f64, f64)> = HashMap::new();
@@ -145,12 +153,23 @@ impl ElementProvider for Osm {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0);
 
+            let wall_substance = parse_substance(
+                tags.get("building:material").map(|s| s.as_str()),
+                tags.get("building:colour").map(|s| s.as_str()),
+                SubstanceType::Wall,
+            );
+            let roof_substance = parse_substance(
+                tags.get("roof:material").map(|s| s.as_str()),
+                tags.get("roof:colour").map(|s| s.as_str()),
+                SubstanceType::Roof,
+            );
+
             let building = Building {
                 kind,
                 levels,
                 underground_levels,
-                color: None,
-                material: None,
+                wall_substance,
+                roof_substance,
             };
 
             match el.element_type.as_str() {
@@ -310,6 +329,207 @@ fn merge_ways_into_ring(ways: &[Vec<u64>]) -> Option<Vec<u64>> {
     } else {
         None
     }
+}
+
+pub fn parse_color(s: &str) -> Option<Rgb<u8>> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    // Hex parsing
+    if let Some(hex) = s.strip_prefix('#') {
+        let hex = if hex.len() == 3 {
+            // #RGB -> #RRGGBB
+            format!(
+                "{}{}{}{}{}{}",
+                &hex[0..1],
+                &hex[0..1],
+                &hex[1..2],
+                &hex[1..2],
+                &hex[2..3],
+                &hex[2..3]
+            )
+        } else {
+            hex.to_string()
+        };
+        if hex.len() == 6 {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            return Some(Rgb([r, g, b]));
+        }
+        return None;
+    }
+
+    // Named colours (case‑insensitive)
+    let lower = s.to_lowercase();
+    match lower.as_str() {
+        // OSM overrides for very common colours that differ from CSS
+        "brown" => Some(Rgb([0x80, 0x40, 0x00])), // OSM #804000
+        "orange" => Some(Rgb([0xFF, 0x80, 0x00])), // OSM #FF8000
+
+        // Standard CSS named colours
+        "aliceblue" => Some(Rgb([0xF0, 0xF8, 0xFF])),
+        "antiquewhite" => Some(Rgb([0xFA, 0xEB, 0xD7])),
+        "aqua" | "cyan" => Some(Rgb([0x00, 0xFF, 0xFF])),
+        "aquamarine" => Some(Rgb([0x7F, 0xFF, 0xD4])),
+        "azure" => Some(Rgb([0xF0, 0xFF, 0xFF])),
+        "beige" => Some(Rgb([0xF5, 0xF5, 0xDC])),
+        "bisque" => Some(Rgb([0xFF, 0xE4, 0xC4])),
+        "black" => Some(Rgb([0x00, 0x00, 0x00])),
+        "blanchedalmond" => Some(Rgb([0xFF, 0xEB, 0xCD])),
+        "blue" => Some(Rgb([0x00, 0x00, 0xFF])),
+        "blueviolet" => Some(Rgb([0x8A, 0x2B, 0xE2])),
+        // "brown" – overridden above
+        "burlywood" => Some(Rgb([0xDE, 0xB8, 0x87])),
+        "cadetblue" => Some(Rgb([0x5F, 0x9E, 0xA0])),
+        "chartreuse" => Some(Rgb([0x7F, 0xFF, 0x00])),
+        "chocolate" => Some(Rgb([0xD2, 0x69, 0x1E])),
+        "coral" => Some(Rgb([0xFF, 0x7F, 0x50])),
+        "cornflowerblue" => Some(Rgb([0x64, 0x95, 0xED])),
+        "cornsilk" => Some(Rgb([0xFF, 0xF8, 0xDC])),
+        "crimson" => Some(Rgb([0xDC, 0x14, 0x3C])),
+        "cyan" => Some(Rgb([0x00, 0xFF, 0xFF])),
+        "darkblue" => Some(Rgb([0x00, 0x00, 0x8B])),
+        "darkcyan" => Some(Rgb([0x00, 0x8B, 0x8B])),
+        "darkgoldenrod" => Some(Rgb([0xB8, 0x86, 0x0B])),
+        "darkgray" | "darkgrey" => Some(Rgb([0xA9, 0xA9, 0xA9])),
+        "darkgreen" => Some(Rgb([0x00, 0x64, 0x00])),
+        "darkkhaki" => Some(Rgb([0xBD, 0xB7, 0x6B])),
+        "darkmagenta" => Some(Rgb([0x8B, 0x00, 0x8B])),
+        "darkolivegreen" => Some(Rgb([0x55, 0x6B, 0x2F])),
+        "darkorange" => Some(Rgb([0xFF, 0x8C, 0x00])),
+        "darkorchid" => Some(Rgb([0x99, 0x32, 0xCC])),
+        "darkred" => Some(Rgb([0x8B, 0x00, 0x00])),
+        "darksalmon" => Some(Rgb([0xE9, 0x96, 0x7A])),
+        "darkseagreen" => Some(Rgb([0x8F, 0xBC, 0x8F])),
+        "darkslateblue" => Some(Rgb([0x48, 0x3D, 0x8B])),
+        "darkslategray" | "darkslategrey" => Some(Rgb([0x2F, 0x4F, 0x4F])),
+        "darkturquoise" => Some(Rgb([0x00, 0xCE, 0xD1])),
+        "darkviolet" => Some(Rgb([0x94, 0x00, 0xD3])),
+        "deeppink" => Some(Rgb([0xFF, 0x14, 0x93])),
+        "deepskyblue" => Some(Rgb([0x00, 0xBF, 0xFF])),
+        "dimgray" | "dimgrey" => Some(Rgb([0x69, 0x69, 0x69])),
+        "dodgerblue" => Some(Rgb([0x1E, 0x90, 0xFF])),
+        "firebrick" => Some(Rgb([0xB2, 0x22, 0x22])),
+        "floralwhite" => Some(Rgb([0xFF, 0xFA, 0xF0])),
+        "forestgreen" => Some(Rgb([0x22, 0x8B, 0x22])),
+        "fuchsia" | "magenta" => Some(Rgb([0xFF, 0x00, 0xFF])),
+        "gainsboro" => Some(Rgb([0xDC, 0xDC, 0xDC])),
+        "ghostwhite" => Some(Rgb([0xF8, 0xF8, 0xFF])),
+        "gold" => Some(Rgb([0xFF, 0xD7, 0x00])),
+        "goldenrod" => Some(Rgb([0xDA, 0xA5, 0x20])),
+        "gray" | "grey" => Some(Rgb([0x80, 0x80, 0x80])),
+        "green" => Some(Rgb([0x00, 0x80, 0x00])),
+        "greenyellow" => Some(Rgb([0xAD, 0xFF, 0x2F])),
+        "honeydew" => Some(Rgb([0xF0, 0xFF, 0xF0])),
+        "hotpink" => Some(Rgb([0xFF, 0x69, 0xB4])),
+        "indianred" => Some(Rgb([0xCD, 0x5C, 0x5C])),
+        "indigo" => Some(Rgb([0x4B, 0x00, 0x82])),
+        "ivory" => Some(Rgb([0xFF, 0xFF, 0xF0])),
+        "khaki" => Some(Rgb([0xF0, 0xE6, 0x8C])),
+        "lavender" => Some(Rgb([0xE6, 0xE6, 0xFA])),
+        "lavenderblush" => Some(Rgb([0xFF, 0xF0, 0xF5])),
+        "lawngreen" => Some(Rgb([0x7C, 0xFC, 0x00])),
+        "lemonchiffon" => Some(Rgb([0xFF, 0xFA, 0xCD])),
+        "lightblue" => Some(Rgb([0xAD, 0xD8, 0xE6])),
+        "lightcoral" => Some(Rgb([0xF0, 0x80, 0x80])),
+        "lightcyan" => Some(Rgb([0xE0, 0xFF, 0xFF])),
+        "lightgoldenrodyellow" => Some(Rgb([0xFA, 0xFA, 0xD2])),
+        "lightgray" | "lightgrey" => Some(Rgb([0xD3, 0xD3, 0xD3])),
+        "lightgreen" => Some(Rgb([0x90, 0xEE, 0x90])),
+        "lightpink" => Some(Rgb([0xFF, 0xB6, 0xC1])),
+        "lightsalmon" => Some(Rgb([0xFF, 0xA0, 0x7A])),
+        "lightseagreen" => Some(Rgb([0x20, 0xB2, 0xAA])),
+        "lightskyblue" => Some(Rgb([0x87, 0xCE, 0xFA])),
+        "lightslategray" | "lightslategrey" => Some(Rgb([0x77, 0x88, 0x99])),
+        "lightsteelblue" => Some(Rgb([0xB0, 0xC4, 0xDE])),
+        "lightyellow" => Some(Rgb([0xFF, 0xFF, 0xE0])),
+        "lime" => Some(Rgb([0x00, 0xFF, 0x00])),
+        "limegreen" => Some(Rgb([0x32, 0xCD, 0x32])),
+        "linen" => Some(Rgb([0xFA, 0xF0, 0xE6])),
+        "magenta" => Some(Rgb([0xFF, 0x00, 0xFF])),
+        "maroon" => Some(Rgb([0x80, 0x00, 0x00])),
+        "mediumaquamarine" => Some(Rgb([0x66, 0xCD, 0xAA])),
+        "mediumblue" => Some(Rgb([0x00, 0x00, 0xCD])),
+        "mediumorchid" => Some(Rgb([0xBA, 0x55, 0xD3])),
+        "mediumpurple" => Some(Rgb([0x93, 0x70, 0xDB])),
+        "mediumseagreen" => Some(Rgb([0x3C, 0xB3, 0x71])),
+        "mediumslateblue" => Some(Rgb([0x7B, 0x68, 0xEE])),
+        "mediumspringgreen" => Some(Rgb([0x00, 0xFA, 0x9A])),
+        "mediumturquoise" => Some(Rgb([0x48, 0xD1, 0xCC])),
+        "mediumvioletred" => Some(Rgb([0xC7, 0x15, 0x85])),
+        "midnightblue" => Some(Rgb([0x19, 0x19, 0x70])),
+        "mintcream" => Some(Rgb([0xF5, 0xFF, 0xFA])),
+        "mistyrose" => Some(Rgb([0xFF, 0xE4, 0xE1])),
+        "moccasin" => Some(Rgb([0xFF, 0xE4, 0xB5])),
+        "navajowhite" => Some(Rgb([0xFF, 0xDE, 0xAD])),
+        "navy" => Some(Rgb([0x00, 0x00, 0x80])),
+        "oldlace" => Some(Rgb([0xFD, 0xF5, 0xE6])),
+        "olive" => Some(Rgb([0x80, 0x80, 0x00])),
+        "olivedrab" => Some(Rgb([0x6B, 0x8E, 0x23])),
+        // "orange" – overridden above
+        "orangered" => Some(Rgb([0xFF, 0x45, 0x00])),
+        "orchid" => Some(Rgb([0xDA, 0x70, 0xD6])),
+        "palegoldenrod" => Some(Rgb([0xEE, 0xE8, 0xAA])),
+        "palegreen" => Some(Rgb([0x98, 0xFB, 0x98])),
+        "paleturquoise" => Some(Rgb([0xAF, 0xEE, 0xEE])),
+        "palevioletred" => Some(Rgb([0xDB, 0x70, 0x93])),
+        "papayawhip" => Some(Rgb([0xFF, 0xEF, 0xD5])),
+        "peachpuff" => Some(Rgb([0xFF, 0xDA, 0xB9])),
+        "peru" => Some(Rgb([0xCD, 0x85, 0x3F])),
+        "pink" => Some(Rgb([0xFF, 0xC0, 0xCB])),
+        "plum" => Some(Rgb([0xDD, 0xA0, 0xDD])),
+        "powderblue" => Some(Rgb([0xB0, 0xE0, 0xE6])),
+        "purple" => Some(Rgb([0x80, 0x00, 0x80])),
+        "rebeccapurple" => Some(Rgb([0x66, 0x33, 0x99])),
+        "red" => Some(Rgb([0xFF, 0x00, 0x00])),
+        "rosybrown" => Some(Rgb([0xBC, 0x8F, 0x8F])),
+        "royalblue" => Some(Rgb([0x41, 0x69, 0xE1])),
+        "saddlebrown" => Some(Rgb([0x8B, 0x45, 0x13])),
+        "salmon" => Some(Rgb([0xFA, 0x80, 0x72])),
+        "sandybrown" => Some(Rgb([0xF4, 0xA4, 0x60])),
+        "seagreen" => Some(Rgb([0x2E, 0x8B, 0x57])),
+        "seashell" => Some(Rgb([0xFF, 0xF5, 0xEE])),
+        "sienna" => Some(Rgb([0xA0, 0x52, 0x2D])),
+        "silver" => Some(Rgb([0xC0, 0xC0, 0xC0])),
+        "skyblue" => Some(Rgb([0x87, 0xCE, 0xEB])),
+        "slateblue" => Some(Rgb([0x6A, 0x5A, 0xCD])),
+        "slategray" | "slategrey" => Some(Rgb([0x70, 0x80, 0x90])),
+        "snow" => Some(Rgb([0xFF, 0xFA, 0xFA])),
+        "springgreen" => Some(Rgb([0x00, 0xFF, 0x7F])),
+        "steelblue" => Some(Rgb([0x46, 0x82, 0xB4])),
+        "tan" => Some(Rgb([0xD2, 0xB4, 0x8C])),
+        "teal" => Some(Rgb([0x00, 0x80, 0x80])),
+        "thistle" => Some(Rgb([0xD8, 0xBF, 0xD8])),
+        "tomato" => Some(Rgb([0xFF, 0x63, 0x47])),
+        "turquoise" => Some(Rgb([0x40, 0xE0, 0xD0])),
+        "violet" => Some(Rgb([0xEE, 0x82, 0xEE])),
+        "wheat" => Some(Rgb([0xF5, 0xDE, 0xB3])),
+        "white" => Some(Rgb([0xFF, 0xFF, 0xFF])),
+        "whitesmoke" => Some(Rgb([0xF5, 0xF5, 0xF5])),
+        "yellow" => Some(Rgb([0xFF, 0xFF, 0x00])),
+        "yellowgreen" => Some(Rgb([0x9A, 0xCD, 0x32])),
+        _ => None, // unknown name
+    }
+}
+
+fn parse_substance(
+    material_str: Option<&str>,
+    colour_str: Option<&str>,
+    typ: SubstanceType,
+) -> Option<Substance> {
+    let material = material_str.and_then(|s| Material::from_str(s).ok());
+    let colour = colour_str.and_then(|s| parse_color(s));
+
+    let a = match (material, colour) {
+        (Some(mat), Some(col)) => Some(Substance::from((typ, col, mat))),
+        (Some(mat), None) => Some(Substance::from((typ, mat))),
+        (None, Some(col)) => Some(Substance::from((typ, col))),
+        (None, None) => None,
+    };
+    println!("{a:?} {material_str:?}");
+    a
 }
 
 fn parse_building_kind(value: &str) -> BuildingKind {

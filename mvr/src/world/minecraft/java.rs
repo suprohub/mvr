@@ -1,15 +1,16 @@
 use std::{
     cmp::Ordering,
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fs::{self, File},
     path::Path,
-    sync::Arc,
+    sync::{Arc, LazyLock, Mutex},
 };
 
 use anyhow::Result;
 use derive_more::{Deref, DerefMut};
 use fxhash::{FxBuildHasher, FxHashMap};
 use glam::{IVec2, IVec3};
+use palette::{IntoColor, Oklab, Srgb, color_difference::EuclideanDistance};
 use silverfish::{Block, Coords, Region};
 
 use crate::world::{Choice, EditorImpl};
@@ -125,7 +126,7 @@ impl<S: SubstanceSolver<Block>> EditorImpl<Block, S> for Java<S> {
         let region = self
             .regions
             .entry(rpos)
-            .or_insert_with(|| Region::empty(rpos.into()));
+            .or_insert_with(|| Region::full_empty(rpos.into()));
         region.set_block(java_block_pos(pos), block).unwrap();
         region.write_blocks().unwrap();
     }
@@ -145,7 +146,7 @@ impl<S: SubstanceSolver<Block>> EditorImpl<Block, S> for Java<S> {
             let region = self
                 .regions
                 .entry(rpos)
-                .or_insert_with(|| Region::empty(rpos.into()));
+                .or_insert_with(|| Region::full_empty(rpos.into()));
             for (bpos, block) in group {
                 let _ = region.set_block(bpos, block);
             }
@@ -171,7 +172,7 @@ impl<S: SubstanceSolver<Block>> EditorImpl<Block, S> for Java<S> {
 
         fs::write(
             path.join("level.dat"),
-            include_bytes!("../../../assets/minecraft/java/level.dat"),
+            include_bytes!("../../../../assets/minecraft/java/level.dat"),
         )?;
 
         Ok(())
@@ -194,14 +195,144 @@ pub fn local_block_pos(region: IVec2, local: Coords) -> IVec3 {
     )
 }
 
-#[derive(Debug, Default)]
-pub struct VanillaSolver;
+// block id -> (block parameter : color)
+// example: oak_log -> (axis=y : color, axis=z: color)
+static COLORS: LazyLock<Mutex<Option<Arc<HashMap<&'static str, Vec<(&'static str, Oklab)>>>>>> =
+    LazyLock::new(|| Default::default());
+
+#[derive(Debug)]
+pub struct VanillaSolver {
+    colors: Arc<HashMap<&'static str, Vec<(&'static str, Oklab)>>>,
+}
+
+impl Default for VanillaSolver {
+    fn default() -> Self {
+        Self {
+            colors: if let Some(colors) = &*COLORS.lock().unwrap() {
+                colors.clone()
+            } else {
+                let arc = Arc::new(mc_block_color::get_block_colors());
+                *COLORS.lock().unwrap() = Some(arc.clone());
+                arc
+            },
+        }
+    }
+}
+
+impl Drop for VanillaSolver {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self.colors) == 2 {
+            *COLORS.lock().unwrap() = None;
+        }
+    }
+}
 
 impl SubstanceSolver<Block> for VanillaSolver {
     fn substance_to_choice(&self, substance: Substance) -> Choice<Block> {
         match substance.kind {
             SubstanceKind::Material(material) => material_to_choice(material.into(), substance.typ),
+            SubstanceKind::Color(color) => {
+                // Rgb<u8> -> Oklab<f32> (через palette::Srgb)
+                let target: Oklab = Srgb::new(
+                    color.0[0] as f32 / 255.0,
+                    color.0[1] as f32 / 255.0,
+                    color.0[2] as f32 / 255.0,
+                )
+                .into_color();
+
+                let mut candidates: Vec<(f32, Block)> = Vec::new();
+
+                for (&block_id, variants) in self.colors.iter() {
+                    for &(param_str, block_color) in variants {
+                        // Пропускаем, если не можем построить блок с заданными свойствами
+                        let block = if param_str.is_empty() {
+                            Block::new(block_id)
+                        } else {
+                            // Разбираем "key=value,key2=value2"
+                            let props: Vec<_> = param_str
+                                .split(',')
+                                .map(|pair| {
+                                    let (k, v) = pair.split_once('=').unwrap();
+                                    (k.trim(), v.trim())
+                                })
+                                .collect();
+                            Block::try_new_with_props(block_id, &props).unwrap()
+                        };
+
+                        let dist = target.distance(block_color);
+                        candidates.push((dist, block));
+                    }
+                }
+
+                // Сортируем по расстоянию
+                candidates
+                    .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+                if candidates.len() >= 3 && candidates[2].0 <= 0.2 {
+                    // Берём три лучших по расстоянию
+                    let top: Vec<(f32, Block)> = candidates.into_iter().take(3).collect();
+                    // Вес = 1 / (distance + epsilon), чтобы избежать деления на ноль
+                    let epsilon = 1e-6;
+                    let mut weights: Vec<f32> =
+                        top.iter().map(|(d, _)| 1.0 / (d + epsilon)).collect();
+                    let sum: f32 = weights.iter().sum();
+                    for w in &mut weights {
+                        *w /= sum; // нормализация, чтобы сумма вероятностей = 1
+                    }
+                    let weighted: Vec<(f32, Block)> = weights
+                        .into_iter()
+                        .zip(top.into_iter().map(|(_, b)| b))
+                        .collect();
+                    Choice::Weighted(weighted)
+                } else if let Some(best) = candidates.into_iter().next() {
+                    Choice::Single(best.1)
+                } else {
+                    Choice::Single(Block::new("stone")) // fallback
+                }
+            }
+            SubstanceKind::ColorfulMaterial(color, material) => {
+                // 1. Выбор по цвету (80%)
+                let color_choice = self.substance_to_choice(Substance {
+                    kind: SubstanceKind::Color(color),
+                    typ: substance.typ,
+                });
+                // 2. Выбор по материалу (20%)
+                let material_choice = self.substance_to_choice(Substance {
+                    kind: SubstanceKind::Material(material),
+                    typ: substance.typ,
+                });
+
+                // Нормализуем веса внутри каждого выбора
+                let color_normalized = normalize_choice(color_choice);
+                let material_normalized = normalize_choice(material_choice);
+
+                // Смешиваем с пропорцией 80/20
+                let mut combined = Vec::new();
+                for (w, b) in color_normalized {
+                    combined.push((w * 0.8, b));
+                }
+                for (w, b) in material_normalized {
+                    combined.push((w * 0.2, b));
+                }
+
+                Choice::Weighted(combined)
+            }
             _ => material_to_choice(Material::Stones, substance.typ),
+        }
+    }
+}
+
+/// Приводит любой Choice к нормализованному списку (вес, блок) с суммой весов = 1.0
+fn normalize_choice(choice: Choice<Block>) -> Vec<(f32, Block)> {
+    match choice {
+        Choice::Single(block) => vec![(1.0, block)],
+        Choice::Uniform(blocks) => {
+            let n = blocks.len() as f32;
+            blocks.into_iter().map(|b| (1.0 / n, b)).collect()
+        }
+        Choice::Weighted(weighted) => {
+            let sum: f32 = weighted.iter().map(|(w, _)| w).sum();
+            weighted.into_iter().map(|(w, b)| (w / sum, b)).collect()
         }
     }
 }

@@ -18,11 +18,15 @@ const FLOOR_HEIGHT: i32 = 3 + 1;
 
 impl<V: Clone + std::fmt::Debug, S: SubstanceSolver<V>> ProcessElement<V, S> for Building {
     fn process_element_impl(
-        self,
+        mut self,
         editor: &mut impl EditorImpl<V, S>,
         elevation: &mut Elevation,
         geometry: Geometry<i32>,
     ) {
+        self.wall_substance = Some(
+            self.wall_substance
+                .unwrap_or_else(|| Substance::from(Material::Stones)),
+        );
         match geometry {
             Geometry::Polygon(polygon) => {
                 debug!("Polygon: {polygon:?}");
@@ -61,28 +65,12 @@ impl<V: Clone + std::fmt::Debug, S: SubstanceSolver<V>> ProcessElement<V, S> for
                     }
                 }
 
-                let wall_mat = Material::Stones;
                 let slab_mat = Material::Stones;
 
                 for i in 1..=underground {
-                    let z_bottom = base_height - i * FLOOR_HEIGHT;
-                    let pts3d: Vec<IVec3> = pts2d
-                        .iter()
-                        .map(|p| IVec3::new(p.x, p.y, z_bottom))
-                        .collect();
+                    let z = base_height - i * FLOOR_HEIGHT;
+                    let pts3d: Vec<IVec3> = pts2d.iter().map(|p| IVec3::new(p.x, p.y, z)).collect();
                     editor.fill_polygon(pts3d, Some(slab_mat), None::<Substance>);
-
-                    let z_start = z_bottom + 1;
-                    let z_end = if i == 1 {
-                        base_height - 1
-                    } else {
-                        base_height - (i - 1) * FLOOR_HEIGHT - 1
-                    };
-                    for z in z_start..=z_end {
-                        let pts3d: Vec<IVec3> =
-                            pts2d.iter().map(|p| IVec3::new(p.x, p.y, z)).collect();
-                        editor.fill_polygon(pts3d, None::<Substance>, Some(wall_mat));
-                    }
                 }
 
                 for i in 0..=levels {
@@ -91,13 +79,23 @@ impl<V: Clone + std::fmt::Debug, S: SubstanceSolver<V>> ProcessElement<V, S> for
                     editor.fill_polygon(pts3d, Some(slab_mat), None::<Substance>);
                 }
 
-                for i in 0..levels {
-                    let z_start = base_height + i * FLOOR_HEIGHT + 1;
-                    let z_end = base_height + (i + 1) * FLOOR_HEIGHT - 1;
-                    for z in z_start..=z_end {
+                for i in 1..=underground {
+                    let z_bottom = base_height - i * FLOOR_HEIGHT;
+                    let z_top = base_height - (i - 1) * FLOOR_HEIGHT;
+                    for z in z_bottom..=z_top {
                         let pts3d: Vec<IVec3> =
                             pts2d.iter().map(|p| IVec3::new(p.x, p.y, z)).collect();
-                        editor.fill_polygon(pts3d, None::<Substance>, Some(wall_mat));
+                        editor.fill_polygon(pts3d, None::<Substance>, self.wall_substance.clone());
+                    }
+                }
+
+                for i in 0..levels {
+                    let z_bottom = base_height + i * FLOOR_HEIGHT;
+                    let z_top = base_height + (i + 1) * FLOOR_HEIGHT;
+                    for z in z_bottom..=z_top {
+                        let pts3d: Vec<IVec3> =
+                            pts2d.iter().map(|p| IVec3::new(p.x, p.y, z)).collect();
+                        editor.fill_polygon(pts3d, None::<Substance>, self.wall_substance.clone());
                     }
                 }
 
@@ -115,11 +113,11 @@ impl<V: Clone + std::fmt::Debug, S: SubstanceSolver<V>> ProcessElement<V, S> for
                     .collect();
 
                 for i in 0..levels {
-                    let z_wall_start = base_height + i * FLOOR_HEIGHT + 1;
-                    let z_wall_end = base_height + (i + 1) * FLOOR_HEIGHT - 1;
-                    let sill_z = z_wall_start + sill_height;
+                    let z_wall_start = base_height + i * FLOOR_HEIGHT;
+                    let z_wall_end = base_height + (i + 1) * FLOOR_HEIGHT;
+                    let sill_z = z_wall_start + 1 + sill_height;
                     let top_z = sill_z + window_height - 1;
-                    if top_z > z_wall_end {
+                    if top_z > z_wall_end - 1 {
                         continue;
                     }
 

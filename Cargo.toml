@@ -1,46 +1,21 @@
-[package]
-name = "mvr"
-authors = ["suprohub <suprohub@gmail.com>"]
-version = "0.1.0"
-edition = "2024"
-description = "World Maps to Voxels Reconstruction"
-repository = "https://github.com/suprohub/mvr"
-readme = "README.md"
-license = "MIT OR Apache-2.0"
-keywords = [
+[workspace]
+resolver = "3"
+members = [
     "mvr",
-    "world",
-    "maps",
-    "map",
-    "reconstruction",
-    "geospatial",
-    "minecraft",
-    "mc",
+    "mc-block-color",
 ]
-categories = ["geospatial"]
 
-[dependencies]
-anyhow = "1.0"
-clap = { version = "4.6", features = ["derive"] }
-derive_more = { version = "2.1", features = ["full"] }
-dirs = "6.0"
-disponent = "0.2"
-either = "1.15"
-futures = "0.3"
-fxhash = "0.2"
-geo = "0.33"
-glam = "0.32"
-image = "0.25"
-litemap = "0.8"
-ndarray = "0.17"
-nonany = "0.3"
-rand = "0.10"
-rayon = "1.12"
-reqwest = { version = "0.13", features = ["query"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-silverfish = { git = "https://github.com/suprohub/silverfish" }
-simdnbt = "0.10"
-tokio = { version = "1.52", features = ["full"] }
-tracing = "0.1"
-tracing-subscriber = "0.3"
+[workspace.package]
+authors = ["suprohub <suprohub@gmail.com>"]
+edition = "2024"
+repository = "https://github.com/suprohub/mvr"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+strip = true
+lto = "thin"

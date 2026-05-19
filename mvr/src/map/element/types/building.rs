@@ -1,13 +1,13 @@
 use image::Rgb;
 
-use crate::map::element::types::material::Material;
+use crate::map::element::types::material::{Material, Substance, SubstanceKind};
 
 pub struct Building {
     pub kind: BuildingKind,
     pub levels: u16,
     pub underground_levels: u8,
-    pub color: Option<Rgb<u8>>,
-    pub material: Option<Material>,
+    pub wall_substance: Option<Substance>,
+    pub roof_substance: Option<Substance>,
 }
 
 /// Type of building.

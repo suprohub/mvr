@@ -1,0 +1,49 @@
+[package]
+name = "mvr"
+authors.workspace = true
+version = "0.1.0"
+edition.workspace = true
+description = "World Maps to Voxels Reconstruction"
+repository.workspace = true
+readme = "README.md"
+license.workspace = true
+keywords = [
+    "mvr",
+    "world",
+    "maps",
+    "map",
+    "reconstruction",
+    "geospatial",
+    "minecraft",
+    "mc",
+]
+categories = ["geospatial"]
+
+[dependencies]
+mc-block-color = { path = "../mc-block-color" }
+anyhow = "1.0"
+clap = { version = "4.6", features = ["derive"] }
+derive_more = { version = "2.1", features = ["full"] }
+dirs = "6.0"
+disponent = "0.2"
+either = "1.15"
+futures = "0.3"
+fxhash = "0.2"
+geo = "0.33"
+glam = "0.32"
+image = "0.25"
+litemap = "0.8"
+ndarray = "0.17"
+nonany = "0.3"
+rand = "0.10"
+rayon = "1.12"
+reqwest = { version = "0.13", features = ["query"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+silverfish = { git = "https://github.com/suprohub/silverfish" }
+simdnbt = "0.10"
+strum = { version = "0.28", features = ["derive"] }
+tokio = { version = "1.52", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+palette = "0.7"
